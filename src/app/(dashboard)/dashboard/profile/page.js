@@ -306,7 +306,7 @@ export default function ProfilePage() {
 
   const updateConnectTimeout = async (ms) => {
     const numMs = parseInt(ms);
-    if (isNaN(numMs) || numMs < 1000 || numMs > 120000) return;
+    if (isNaN(numMs) || numMs < 200 || numMs > 120000) return;
 
     try {
       const res = await fetch("/api/settings", {
@@ -1501,9 +1501,8 @@ export default function ProfilePage() {
               </div>
               <Input
                 type="number"
-                min="1000"
+                min="200"
                 max="120000"
-                step="1000"
                 value={settings.connectTimeoutMs || 15000}
                 onChange={(e) => updateConnectTimeout(e.target.value)}
                 disabled={loading}

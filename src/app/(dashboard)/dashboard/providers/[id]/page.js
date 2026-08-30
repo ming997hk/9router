@@ -445,7 +445,7 @@ export default function ProviderDetailPage() {
       saveProviderConnectTimeout(null);
     } else {
       const num = parseInt(trimmed);
-      if (!isNaN(num) && num >= 1000 && num <= 120000) {
+      if (!isNaN(num) && num >= 200 && num <= 120000) {
         saveProviderConnectTimeout(num);
       }
     }
@@ -1538,9 +1538,8 @@ export default function ProviderDetailPage() {
                   <span className="text-xs text-text-muted" title="Per-provider connect timeout in ms. Leave blank to use the global default.">Timeout&nbsp;(ms):</span>
                   <input
                     type="number"
-                    min={1000}
+                    min={200}
                     max={120000}
-                    step={1000}
                     value={providerConnectTimeout}
                     onChange={(e) => handleProviderConnectTimeoutChange(e.target.value)}
                     placeholder="global"
