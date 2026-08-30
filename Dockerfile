@@ -7,9 +7,11 @@ FROM base AS builder
 
 RUN apk --no-cache upgrade && apk --no-cache add python3 make g++ linux-headers
 
-COPY package.json ./
-RUN --mount=type=cache,target=/root/.npm \
-  npm install
+COPY package.json package-lock.json* ./
+# BuildKit `--mount=type=cache` requires DOCKER_BUILDKIT=1 and a `,id=` field
+# (Railway's build context doesn't always pass them through). The plain form
+# below works under both classic builder and BuildKit.
+RUN npm install
 
 COPY . ./
 ENV NEXT_TELEMETRY_DISABLED=1
