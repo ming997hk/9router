@@ -10,9 +10,11 @@
   `Settings → Routing Strategy`, per-provider input in the provider page next
   to the Round Robin toggle.
 - **Routing**: configurable account lockout max (`backoffMaxMs`, default 60s).
-  Caps the exponential backoff (2s→4s→8s→...→5min) at a user-defined maximum
-  so failed accounts recover faster. Lower values (30s) retry sooner; higher
-  values (5min) are gentler on providers. UI: `Settings → Routing Strategy`.
+  Caps the exponential backoff at a user-defined maximum so failed accounts
+  recover faster. Now configurable up to 30 minutes. Lower values (30s) retry
+  sooner; higher values (30min) are gentler. Plus a configurable backoff base
+  (`backoffBaseMs`, default 2s) that the exponential chart starts from.
+  UI: `Settings → Routing Strategy`.
 - **Dashboard**: test button now shows response latency in ms next to the model
   after clicking Test. Green for success, red for failure.
 
