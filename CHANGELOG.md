@@ -9,6 +9,12 @@
   `FETCH_CONNECT_TIMEOUT_MS=60000`) still applies. UI: global input in
   `Settings → Routing Strategy`, per-provider input in the provider page next
   to the Round Robin toggle.
+- **Routing**: configurable account lockout max (`backoffMaxMs`, default 60s).
+  Caps the exponential backoff (2s→4s→8s→...→5min) at a user-defined maximum
+  so failed accounts recover faster. Lower values (30s) retry sooner; higher
+  values (5min) are gentler on providers. UI: `Settings → Routing Strategy`.
+- **Dashboard**: test button now shows response latency in ms next to the model
+  after clicking Test. Green for success, red for failure.
 
 # v0.5.59 (2026-08-29)
 
