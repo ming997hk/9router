@@ -263,6 +263,15 @@ export async function markAccountUnavailable(connectionId, status, errorText, pr
   }
   if (!shouldFallback) return { shouldFallback: false, cooldownMs: 0 };
 
+  // Cap cooldown at user-configured backoffMaxMs (default 60s).
+  // This prevents accounts from being locked for the full 5-minute exponential
+  // backoff when the user wants faster recovery (e.g. NIM with 10 accounts).
+  const settings = await getSettings();
+  const maxCooldown = settings?.backoffMaxMs || 60000;
+  if (cooldownMs > maxCooldown) {
+    cooldownMs = maxCooldown;
+  }
+
   const reason = typeof errorText === "string" ? errorText.slice(0, 100) : "Provider error";
   const lockUpdate = buildModelLockUpdate(githubResetAtMs ? null : model, cooldownMs);
 

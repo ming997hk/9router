@@ -1099,6 +1099,7 @@ export default function ProviderDetailPage() {
   const handleTestModel = async (modelId) => {
     if (testingModelIds.has(modelId)) return;
     setTestingModelIds((prev) => new Set(prev).add(modelId));
+    const t0 = Date.now();
     try {
       const res = await fetch("/api/models/test", {
         method: "POST",
@@ -1106,10 +1107,12 @@ export default function ProviderDetailPage() {
         body: JSON.stringify({ model: `${providerStorageAlias}/${modelId}` }),
       });
       const data = await res.json();
-      setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? "ok" : "error" }));
+      const latencyMs = Date.now() - t0;
+      setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? { status: "ok", latencyMs } : { status: "error", latencyMs } }));
       setModelsTestError(data.ok ? "" : (data.error || "Model not reachable"));
     } catch {
-      setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
+      const latencyMs = Date.now() - t0;
+      setModelTestResults((prev) => ({ ...prev, [modelId]: { status: "error", latencyMs } }));
       setModelsTestError("Network error");
     } finally {
       setTestingModelIds((prev) => { const n = new Set(prev); n.delete(modelId); return n; });

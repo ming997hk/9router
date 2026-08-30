@@ -19,6 +19,12 @@ const DEFAULT_SETTINGS = {
   // to fail over from a stalled provider (e.g. rate-limited NIM) within a
   // reasonable budget.
   connectTimeoutMs: 15000,
+  // Maximum account lockout duration (ms) after repeated failures.
+  // Controls how long a rate-limited or errored account stays locked before
+  // being retried. Lower values (e.g. 60000 = 1min) recover faster but may
+  // hammer a still-bad provider. Higher values (e.g. 300000 = 5min) are
+  // gentler on providers but slower to recover. Default: 60000 (1 minute).
+  backoffMaxMs: 60000,
   providerStrategies: {},
   quotaVisibility: {},
   comboStrategy: "fallback",

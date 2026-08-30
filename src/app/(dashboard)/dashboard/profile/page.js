@@ -322,6 +322,24 @@ export default function ProfilePage() {
     }
   };
 
+  const updateBackoffMax = async (ms) => {
+    const numMs = parseInt(ms);
+    if (isNaN(numMs) || numMs < 5000 || numMs > 600000) return;
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backoffMaxMs: numMs }),
+      });
+      if (res.ok) {
+        setSettings(prev => ({ ...prev, backoffMaxMs: numMs }));
+      }
+    } catch (err) {
+      console.error("Failed to update backoff max:", err);
+    }
+  };
+
   const updateComboStickyLimit = async (limit) => {
     const numLimit = parseInt(limit);
     if (isNaN(numLimit) || numLimit < 1) return;
@@ -1505,6 +1523,25 @@ export default function ProfilePage() {
                 max="120000"
                 value={settings.connectTimeoutMs || 15000}
                 onChange={(e) => updateConnectTimeout(e.target.value)}
+                disabled={loading}
+                className="w-20 sm:w-24 text-center shrink-0"
+              />
+            </div>
+
+            {/* Account Lockout Max (ms) */}
+            <div className="flex items-start sm:items-center justify-between gap-4 pt-4 border-t border-border/50">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm sm:text-base">Account Lockout Max (ms)</p>
+                <p className="text-xs sm:text-sm text-text-muted">
+                  Maximum time a failed account stays locked before retry. Lower = faster recovery, higher = gentler on providers. Exponential backoff (2s→4s→8s→...) is capped at this value.
+                </p>
+              </div>
+              <Input
+                type="number"
+                min="5000"
+                max="600000"
+                value={settings.backoffMaxMs || 60000}
+                onChange={(e) => updateBackoffMax(e.target.value)}
                 disabled={loading}
                 className="w-20 sm:w-24 text-center shrink-0"
               />

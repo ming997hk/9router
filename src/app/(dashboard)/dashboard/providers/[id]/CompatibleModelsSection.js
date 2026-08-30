@@ -81,6 +81,7 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
   const handleTestModel = async (modelId) => {
     if (testingModelId) return;
     setTestingModelId(modelId);
+    const t0 = Date.now();
     try {
       const res = await fetch("/api/models/test", {
         method: "POST",
@@ -88,9 +89,11 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
         body: JSON.stringify({ model: `${providerStorageAlias}/${modelId}` }),
       });
       const data = await res.json();
-      setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? "ok" : "error" }));
+      const latencyMs = Date.now() - t0;
+      setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? { status: "ok", latencyMs } : { status: "error", latencyMs } }));
     } catch {
-      setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
+      const latencyMs = Date.now() - t0;
+      setModelTestResults((prev) => ({ ...prev, [modelId]: { status: "error", latencyMs } }));
     } finally {
       setTestingModelId(null);
     }
