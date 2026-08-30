@@ -22,9 +22,13 @@ const DEFAULT_SETTINGS = {
   // Maximum account lockout duration (ms) after repeated failures.
   // Controls how long a rate-limited or errored account stays locked before
   // being retried. Lower values (e.g. 60000 = 1min) recover faster but may
-  // hammer a still-bad provider. Higher values (e.g. 300000 = 5min) are
+  // hammer a still-bad provider. Higher values (e.g. 1800000 = 30min) are
   // gentler on providers but slower to recover. Default: 60000 (1 minute).
   backoffMaxMs: 60000,
+  // Base lockout duration (ms) for the first failure. The exponential backoff
+  // starts here and doubles each time: base → base×2 → base×4 → ...
+  // until it reaches backoffMaxMs. Default: 2000 (2 seconds).
+  backoffBaseMs: 2000,
   providerStrategies: {},
   quotaVisibility: {},
   comboStrategy: "fallback",

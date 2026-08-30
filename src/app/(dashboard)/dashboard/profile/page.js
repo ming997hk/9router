@@ -324,7 +324,7 @@ export default function ProfilePage() {
 
   const updateBackoffMax = async (ms) => {
     const numMs = parseInt(ms);
-    if (isNaN(numMs) || numMs < 5000 || numMs > 600000) return;
+    if (isNaN(numMs) || numMs < 5000 || numMs > 3600000) return;
 
     try {
       const res = await fetch("/api/settings", {
@@ -337,6 +337,24 @@ export default function ProfilePage() {
       }
     } catch (err) {
       console.error("Failed to update backoff max:", err);
+    }
+  };
+
+  const updateBackoffBase = async (ms) => {
+    const numMs = parseInt(ms);
+    if (isNaN(numMs) || numMs < 1000 || numMs > 60000) return;
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backoffBaseMs: numMs }),
+      });
+      if (res.ok) {
+        setSettings(prev => ({ ...prev, backoffBaseMs: numMs }));
+      }
+    } catch (err) {
+      console.error("Failed to update backoff base:", err);
     }
   };
 
@@ -1533,15 +1551,34 @@ export default function ProfilePage() {
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm sm:text-base">Account Lockout Max (ms)</p>
                 <p className="text-xs sm:text-sm text-text-muted">
-                  Maximum time a failed account stays locked before retry. Lower = faster recovery, higher = gentler on providers. Exponential backoff (2s→4s→8s→...) is capped at this value.
+                  Maximum time a failed account stays locked before retry. Lower = faster recovery, higher = gentler on providers. Exponential backoff (base→base×2→base×4→...) is capped at this value.
                 </p>
               </div>
               <Input
                 type="number"
                 min="5000"
-                max="600000"
+                max="3600000"
                 value={settings.backoffMaxMs || 60000}
                 onChange={(e) => updateBackoffMax(e.target.value)}
+                disabled={loading}
+                className="w-20 sm:w-24 text-center shrink-0"
+              />
+            </div>
+
+            {/* Backoff Base (ms) */}
+            <div className="flex items-start sm:items-center justify-between gap-4 pt-4 border-t border-border/50">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm sm:text-base">Backoff Base (ms)</p>
+                <p className="text-xs sm:text-sm text-text-muted">
+                  Starting lockout after the first failure. Doubles each subsequent failure until the max is reached.
+                </p>
+              </div>
+              <Input
+                type="number"
+                min="1000"
+                max="60000"
+                value={settings.backoffBaseMs || 2000}
+                onChange={(e) => updateBackoffBase(e.target.value)}
                 disabled={loading}
                 className="w-20 sm:w-24 text-center shrink-0"
               />
