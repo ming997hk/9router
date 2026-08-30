@@ -1,0 +1,7 @@
+# Force the Docker builder so Railway uses the existing Dockerfile in the repo
+# (matches how the upstream decolua/9router image is built).
+# Without this, Railpack auto-detects Node.js and the build fails for reasons
+# we can't see (empty build logs).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
