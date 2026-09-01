@@ -1,0 +1,45 @@
+name: Deploy 9Router to VPS
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            echo "=== Deploying 9Router to VPS ==="
+            cd /opt/9router-src
+
+            # Pull the latest fork code (master)
+            echo "--- git pull ---"
+            git pull --ff-only origin master
+
+            # Get the version from package.json for the image tag
+            VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"version": "([^"]+)".*/\1/')
+            echo "  version: $VERSION"
+
+            # Build the image (cached layers make repeat builds fast)
+            echo "--- docker build ---"
+            docker build -t 9router:$VERSION .
+
+            # Update the compose file's image tag to match, then bring up
+            echo "--- docker compose up ---"
+            cd /opt/9router
+            sed -i "s|image: 9router:.*|image: 9router:$VERSION|" docker-compose.yml
+            docker compose up -d
+
+            # Prune old/dangling images after a successful deploy
+            echo "--- prune ---"
+            docker image prune -f >/dev/null 2>&1 || true
+
+            echo "=== Deploy complete: 9router:$VERSION ==="
