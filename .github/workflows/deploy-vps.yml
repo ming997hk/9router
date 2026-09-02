@@ -5,25 +5,64 @@ on:
     branches: [master]
   workflow_dispatch:
 
-# Runs on the SELF-HOSTED runner (vps-9router-prod) on the VPS, as the
-# non-root "9router" user. No SSH keys — the agent runs locally.
+# Build+deploy split (Option B):
+#   - BUILD job runs on GitHub's hosted runner (ubuntu-latest) — build CPU is
+#     off the VPS entirely. Pushes to GHCR.
+#   - DEPLOY job runs on the VPS self-hosted runner (vps-9router-prod, non-root
+#     "9router" user) and only pulls the image + compose up (fast, low CPU).
+
+env:
+  IMAGE: ghcr.io/ming997hk/9router
+
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: ver
+        run: |
+          VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"version": "([^"]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "  version: $VERSION"
+
+      - name: Build and push to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ steps.ver.outputs.version }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+
   deploy:
+    needs: build
     runs-on: self-hosted
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build + deploy
+      - name: Pull + restart on VPS
         run: |
           set -euo pipefail
-          # Build from the runner's checkout (GITHUB_WORKSPACE)
-          VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"version": "([^"]+)".*/\1/')
-          echo "  version: $VERSION"
-          docker build -t 9router:$VERSION .
-          # Update compose tag + bring up (in the persistent app dir)
+          echo "  pulling ${{ env.IMAGE }}:latest"
           cd /opt/9router
-          sed -i "s|image: 9router:.*|image: 9router:$VERSION|" docker-compose.yml
+          docker compose pull 9router
           docker compose up -d
           docker image prune -f >/dev/null 2>&1 || true
-          echo "deploy complete: 9router:$VERSION"
+          echo "  deploy complete"
