@@ -5,19 +5,25 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Runs on the SELF-HOSTED runner (vps-9router-prod) on the VPS, as the
+# non-root "9router" user. No SSH keys — the agent runs locally.
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Trigger deploy via restricted SSH key
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          # The SSH key is locked on the VPS to a forced command
-          # (command="/usr/local/bin/9router-deploy.sh"), so this key CANNOT
-          # run arbitrary shell. The wrapper does git pull -> docker build ->
-          # docker compose up. We send a trivial no-op command here; the
-          # forced command intercepts it and runs the wrapper.
-          script: "deploy-9router"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build + deploy
+        run: |
+          set -euo pipefail
+          # Build from the runner's checkout (GITHUB_WORKSPACE)
+          VERSION=$(grep -m1 '"version"' package.json | sed -E 's/.*"version": "([^"]+)".*/\1/')
+          echo "  version: $VERSION"
+          docker build -t 9router:$VERSION .
+          # Update compose tag + bring up (in the persistent app dir)
+          cd /opt/9router
+          sed -i "s|image: 9router:.*|image: 9router:$VERSION|" docker-compose.yml
+          docker compose up -d
+          docker image prune -f >/dev/null 2>&1 || true
+          echo "deploy complete: 9router:$VERSION"
