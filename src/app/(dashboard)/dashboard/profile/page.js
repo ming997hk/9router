@@ -348,7 +348,7 @@ export default function ProfilePage() {
 
   const updateBackoffBase = async (ms) => {
     const numMs = parseInt(ms);
-    if (isNaN(numMs) || numMs < 1000 || numMs > 60000) return;
+    if (isNaN(numMs) || numMs < 1000) return;
 
     try {
       const res = await fetch("/api/settings", {
@@ -1582,7 +1582,6 @@ export default function ProfilePage() {
               <Input
                 type="number"
                 min="1000"
-                max="60000"
                 value={settings.backoffBaseMs || 2000}
                 onChange={(e) => updateBackoffBase(e.target.value)}
                 disabled={loading}
