@@ -312,7 +312,7 @@ export default function ProfilePage() {
 
   const updateConnectTimeout = async (ms) => {
     const numMs = parseInt(ms);
-    if (isNaN(numMs) || numMs < 200 || numMs > 120000) return;
+    if (isNaN(numMs) || numMs <= 0) return; // Connect Timeout: any positive ms allowed
 
     try {
       const res = await fetch("/api/settings", {
@@ -330,7 +330,7 @@ export default function ProfilePage() {
 
   const updateBackoffMax = async (ms) => {
     const numMs = parseInt(ms);
-    if (isNaN(numMs) || numMs < 5000 || numMs > 3600000) return;
+    if (isNaN(numMs) || numMs <= 0) return; // Account Lockout Max: any positive ms allowed
 
     try {
       const res = await fetch("/api/settings", {
@@ -348,7 +348,7 @@ export default function ProfilePage() {
 
   const updateBackoffBase = async (ms) => {
     const numMs = parseInt(ms);
-    if (isNaN(numMs) || numMs < 1000) return;
+    if (isNaN(numMs) || numMs <= 0) return; // Backoff Base: any positive ms allowed
 
     try {
       const res = await fetch("/api/settings", {
@@ -1543,8 +1543,6 @@ export default function ProfilePage() {
               </div>
               <Input
                 type="number"
-                min="200"
-                max="120000"
                 value={settings.connectTimeoutMs || 15000}
                 onChange={(e) => updateConnectTimeout(e.target.value)}
                 disabled={loading}
@@ -1562,8 +1560,6 @@ export default function ProfilePage() {
               </div>
               <Input
                 type="number"
-                min="5000"
-                max="3600000"
                 value={settings.backoffMaxMs || 60000}
                 onChange={(e) => updateBackoffMax(e.target.value)}
                 disabled={loading}
@@ -1581,7 +1577,6 @@ export default function ProfilePage() {
               </div>
               <Input
                 type="number"
-                min="1000"
                 value={settings.backoffBaseMs || 2000}
                 onChange={(e) => updateBackoffBase(e.target.value)}
                 disabled={loading}
