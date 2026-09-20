@@ -117,7 +117,21 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
   const providerRequiresStreaming = PROVIDERS[provider]?.forceStream === true;
-  let stream = providerRequiresStreaming ? true : (body.stream !== false);
+  // OpenAI spec: an omitted `stream` means FALSE. The old default (`body.stream !== false`)
+  // treated it as true, which broke every client that omits the field: chatCore took the
+  // streaming path, but the same-format (openai->openai) translator skips translation and so
+  // never writes `stream` into the outbound body — the upstream then answered with a plain
+  // chat.completion JSON, and the passthrough stream forwarded that verbatim and appended
+  // `data: [DONE]`. The client received a JSON object with an SSE frame glued to the end,
+  // i.e. not a parseable JSON document (`Extra data: line 1 column N`). Seen with browser
+  // fetch (`Accept: */*`), curl, and any OpenAI-compatible SDK that omits `stream`.
+  // Accept: text/event-stream is the one signal that still means "I want SSE without saying so".
+  const acceptHeader = clientRawRequest?.headers?.accept || "";
+  const clientPrefersJson = acceptHeader.includes("application/json");
+  const clientPrefersSSE = acceptHeader.includes("text/event-stream");
+  // clientRequestedStreaming already covers `stream: true` plus the Gemini-family wire formats,
+  // whose SSE-ness is implied by the endpoint rather than a body field.
+  let stream = providerRequiresStreaming || clientRequestedStreaming || clientPrefersSSE;
 
   // Image generation models require non-streaming (Google v1internal:generateContent)
   const modelType = getModelType(alias, model);
@@ -134,9 +148,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   // Check client Accept header preference for non-streaming requests
   // This fixes AI SDK compatibility where clients send Accept: application/json
-  const acceptHeader = clientRawRequest?.headers?.accept || "";
-  const clientPrefersJson = acceptHeader.includes("application/json");
-  const clientPrefersSSE = acceptHeader.includes("text/event-stream");
+  // (acceptHeader / clientPrefersJson / clientPrefersSSE are resolved above, where the
+  //  stream default is computed — do not redeclare them here.)
   if (clientPrefersJson && !clientPrefersSSE && body.stream !== true && !providerRequiresStreaming) {
     stream = false;
   }
