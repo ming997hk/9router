@@ -1,5 +1,18 @@
 # Unreleased
 
+## Fixes
+- **Streaming**: an omitted `stream` now means non-streaming, per the OpenAI
+  spec. It previously defaulted to streaming, so a client that left the field
+  out was served SSE: the same-format (openai→openai) translator skips
+  translation and never wrote `stream` into the outbound body, the upstream
+  answered with a plain `chat.completion` JSON, and the passthrough stream
+  appended `data: [DONE]` to it — a JSON object with an SSE frame glued on, so
+  not a parseable document (`Extra data: line 1 column N`). Hit by browser
+  `fetch` (`Accept: */*`), curl, and any OpenAI-compatible client that omits
+  the field. Streaming now requires the client to ask: `stream: true`, or
+  `Accept: text/event-stream` for SSE clients that omit it. Providers with
+  `forceStream` still stream upstream and are re-aggregated for JSON clients.
+
 ## Features
 - **Routing**: global connect-timeout setting (`connectTimeoutMs`, default 15s)
   plus a per-provider override. Aborts an upstream request when its response
