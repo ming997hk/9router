@@ -127,6 +127,20 @@ export class BaseExecutor {
     for (let urlIndex = 0; urlIndex < fallbackCount; urlIndex++) {
       const url = this.buildUrl(model, stream, urlIndex, credentials);
       const transformedBody = this.transformRequest(model, body, stream, credentials);
+      // Per-provider BODY overrides, keyed by model id ("*" = every model on this
+      // provider). Applied after transformRequest so they win over translated params,
+      // merged last before the request leaves. `model`/`messages` are the request's
+      // identity, not a tuning knob — never overridable.
+      const bodyOverrides = providerOverrides?.body;
+      if (bodyOverrides && typeof bodyOverrides === "object" && !Array.isArray(bodyOverrides)) {
+        for (const source of [bodyOverrides["*"], bodyOverrides[model]]) {
+          if (!source || typeof source !== "object" || Array.isArray(source)) continue;
+          for (const [key, value] of Object.entries(source)) {
+            if (key === "model" || key === "messages") continue;
+            transformedBody[key] = value;
+          }
+        }
+      }
       const headers = this.buildHeaders(credentials, stream, url, model, transformedBody);
       // User per-provider override wins over registry headers (blocked names filtered at the API)
       if (providerOverrides?.headers) Object.assign(headers, providerOverrides.headers);

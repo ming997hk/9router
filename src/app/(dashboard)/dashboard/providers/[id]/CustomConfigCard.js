@@ -16,6 +16,10 @@ export default function CustomConfigCard({ providerId }) {
   const [builtin, setBuiltin] = useState({});
   const [hasOverride, setHasOverride] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Raw JSON text for per-model body overrides — the only free-form field on this
+  // card, so it is parsed (and rejected loudly) on save rather than on every keystroke.
+  const [bodyJson, setBodyJson] = useState("");
+  const [bodyActive, setBodyActive] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +34,9 @@ export default function CustomConfigCard({ providerId }) {
         setBuiltin(builtinHeaders);
         setRows(headerRows.length ? headerRows : [{ name: "", value: "" }]);
         setHasOverride(Object.keys(data.headers || {}).length > 0);
+        const bodyOverrides = data.body || {};
+        setBodyActive(Object.keys(bodyOverrides).length > 0);
+        setBodyJson(Object.keys(bodyOverrides).length ? JSON.stringify(bodyOverrides, null, 2) : "");
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -60,12 +67,36 @@ export default function CustomConfigCard({ providerId }) {
       if (r.value !== builtin[name]) headers[name] = r.value;
     }
 
+    let bodyOverrides = {};
+    if (bodyJson.trim()) {
+      try {
+        bodyOverrides = JSON.parse(bodyJson);
+      } catch {
+        notify.error("Body overrides must be valid JSON");
+        return;
+      }
+      if (!bodyOverrides || typeof bodyOverrides !== "object" || Array.isArray(bodyOverrides)) {
+        notify.error("Body overrides must be an object keyed by model id");
+        return;
+      }
+      for (const [modelKey, params] of Object.entries(bodyOverrides)) {
+        if (!params || typeof params !== "object" || Array.isArray(params)) {
+          notify.error(`Body override for "${modelKey}" must be an object`);
+          return;
+        }
+        if ("model" in params || "messages" in params) {
+          notify.error(`"model"/"messages" cannot be overridden (request identity)`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/providers/${providerId}/overrides`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ headers }),
+        body: JSON.stringify({ headers, body: bodyOverrides }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -73,18 +104,19 @@ export default function CustomConfigCard({ providerId }) {
         return;
       }
       setHasOverride(Object.keys(headers).length > 0);
-      notify.success("Custom headers saved");
+      setBodyActive(Object.keys(bodyOverrides).length > 0);
+      notify.success("Provider overrides saved");
     } finally {
       setSaving(false);
     }
-  }, [rows, builtin, providerId, notify]);
+  }, [rows, builtin, providerId, notify, bodyJson]);
 
   const resetToBuiltin = () => {
     setRows(Object.entries(builtin).map(([name, value]) => ({ name, value })));
   };
 
-  // Only render when there is something to customize: registry headers or existing overrides
-  if (Object.keys(builtin).length === 0 && !hasOverride) return null;
+  // Always render: body overrides apply to providers with no registry headers too
+  // (e.g. a saved OpenRouter provider pin), so the card must be reachable there.
 
   return (
     <Card padding="xs">
@@ -95,8 +127,8 @@ export default function CustomConfigCard({ providerId }) {
       >
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-[20px]">tune</span>
-          <span className="text-sm font-semibold">Custom Headers</span>
-          {hasOverride && (
+          <span className="text-sm font-semibold">Provider Overrides</span>
+          {(hasOverride || bodyActive) && (
             <Badge variant="success" size="sm">Active</Badge>
           )}
         </div>
@@ -140,6 +172,26 @@ export default function CustomConfigCard({ providerId }) {
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold">Body overrides (JSON)</span>
+              {bodyActive && <Badge variant="success" size="sm">Active</Badge>}
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
+              Keyed by model id, <code>&quot;*&quot;</code> = every model on this provider. Merged into the
+              outgoing request after translation — e.g. OpenRouter routing:
+              <code className="ml-1">{`{"deepseek/deepseek-v4.1-flash-1017":{"provider":{"only":["morph/fp8"],"allow_fallbacks":false}}}`}</code>
+            </p>
+            <textarea
+              value={bodyJson}
+              onChange={(e) => setBodyJson(e.target.value)}
+              placeholder={'{\n  "*": { "service_tier": "flex" }\n}'}
+              spellCheck={false}
+              rows={5}
+              className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs focus:border-primary focus:outline-none"
+            />
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-2">
