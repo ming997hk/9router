@@ -8,8 +8,14 @@ on:
 # Build+deploy split (Option B):
 #   - BUILD job runs on GitHub's hosted runner (ubuntu-latest) — build CPU is
 #     off the VPS entirely. Pushes to GHCR.
-#   - DEPLOY job runs on the VPS self-hosted runner (vps-9router-prod, non-root
-#     "9router" user) and only pulls the image + compose up (fast, low CPU).
+#   - DEPLOY job runs on GitHub's hosted runner too and reaches the VPS over SSH
+#     as the non-root "9router" user (docker group, no sudo). That user's key is
+#     pinned to one forced command (/opt/9router/deploy.sh) with sshd `restrict`,
+#     so the key can deploy and nothing else.
+#
+# NOTE: there are NO self-hosted runners on this account and none may be added
+# (all 14 were deleted 2026-09-26). The old `runs-on: self-hosted` deploy job
+# queued forever and every release had to be deployed by hand.
 #
 # NOTE: builds from the PRODUCTION branch (the fork's custom code), NOT master
 # (master is upstream v0.5.59 + CI only, no custom code).
@@ -60,14 +66,33 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    # Two pushes in a row must not race pull/up on the same compose project.
+    concurrency:
+      group: deploy-9router-prod
+      cancel-in-progress: false
     steps:
+      - name: Install deploy key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H 187.52.117.13 >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Pull + restart on VPS
         run: |
           set -euo pipefail
-          echo "  pulling ${{ env.IMAGE }}:latest"
-          cd /opt/9router
-          docker compose pull 9router
-          docker compose up -d
-          docker image prune -f >/dev/null 2>&1 || true
-          echo "  deploy complete"
+          # The key is pinned to /opt/9router/deploy.sh, so no command is sent;
+          # sshd runs the script and streams its output here.
+          ssh -i ~/.ssh/id_deploy \
+              -o BatchMode=yes -o ConnectTimeout=15 \
+              9router@187.52.117.13
+
+      - name: Verify live health
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 10 --retry-delay 3 --max-time 15 \
+            https://9router.cloudcraft.biz/api/health
+          echo
+          curl -fsS --max-time 15 https://9router.cloudcraft.biz/api/version
